@@ -5,6 +5,13 @@ spotless = "7.0.2"
 checkstyle = "10.21.4"
 palantirJavaFormat = "2.57.0"
 jacoco = "0.8.12"
+telegrambots = "10.2.1"
+
+[libraries]
+# Стартер тянет за собой telegrambots-longpolling, но не клиент: OkHttpTelegramClient
+# лежит в отдельном артефакте, и без него отправлять нечем.
+telegrambots-starter = { module = "org.telegram:telegrambots-springboot-longpolling-starter", version.ref = "telegrambots" }
+telegrambots-client = { module = "org.telegram:telegrambots-client", version.ref = "telegrambots" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }

@@ -16,17 +16,24 @@ java {
 
 repositories { mavenCentral() }
 
-val integrationTest: SourceSet by sourceSets.creating
+// Свой source set видит только то, что ему выдали: без main.output @SpringBootTest не находит
+// @SpringBootConfiguration, без extendsFrom(implementation) — зависимостей сервиса.
+val integrationTest: SourceSet by sourceSets.creating {
+  compileClasspath += sourceSets.main.get().output
+  runtimeClasspath += sourceSets.main.get().output
+}
 
 configurations[integrationTest.implementationConfigurationName]
-  .extendsFrom(configurations.testImplementation.get())
+  .extendsFrom(configurations.implementation.get(), configurations.testImplementation.get())
 configurations[integrationTest.runtimeOnlyConfigurationName]
-  .extendsFrom(configurations.testRuntimeOnly.get())
+  .extendsFrom(configurations.runtimeOnly.get(), configurations.testRuntimeOnly.get())
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-validation")
   implementation("org.springframework.boot:spring-boot-starter-actuator")
+  implementation(libs.telegrambots.starter)
+  implementation(libs.telegrambots.client)
 
   runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
@@ -40,12 +47,14 @@ dependencies {
 
 tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
+tasks.withType<JavaCompile>().configureEach { options.compilerArgs.add("-Xlint:deprecation") }
+
 val integrationTestTask =
   tasks.register<Test>("integrationTest") {
     description = "Интеграционные тесты (Testcontainers)."
     group = "verification"
     testClassesDirs = integrationTest.output.classesDirs
-    classpath = configurations[integrationTest.runtimeClasspathConfigurationName] + integrationTest.output
+    classpath = integrationTest.runtimeClasspath
     shouldRunAfter(tasks.test)
   }
 
