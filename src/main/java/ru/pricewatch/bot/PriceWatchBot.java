@@ -8,6 +8,7 @@ import org.telegram.telegrambots.longpolling.starter.SpringLongPollingBot;
 import org.telegram.telegrambots.longpolling.util.DefaultLongPollingUpdateConsumer;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import ru.pricewatch.config.BotProperties;
+import ru.pricewatch.exception.SourceException;
 import ru.pricewatch.exception.UserInputException;
 
 /**
@@ -18,6 +19,9 @@ import ru.pricewatch.exception.UserInputException;
 public class PriceWatchBot extends DefaultLongPollingUpdateConsumer implements SpringLongPollingBot {
 
     private static final Logger log = LoggerFactory.getLogger(PriceWatchBot.class);
+
+    private static final String SOURCE_UNAVAILABLE =
+            "Не смог получить цену. Проверь ссылку или артикул — и попробуй ещё раз через пару минут.";
 
     private static final String INTERNAL_ERROR = "Что-то пошло не так на моей стороне. Попробуй ещё раз через минуту.";
 
@@ -49,10 +53,13 @@ public class PriceWatchBot extends DefaultLongPollingUpdateConsumer implements S
         long chatId = update.getMessage().getChatId();
         try {
             responder.sendText(
-                    chatId, router.route(update.getMessage().getText()).text());
+                    chatId, router.route(chatId, update.getMessage().getText()).text());
         } catch (UserInputException e) {
             log.warn("Не разобрали ввод из чата {}: {}", chatId, e.getMessage());
             responder.sendText(chatId, e.getMessage());
+        } catch (SourceException e) {
+            log.warn("Источник не отдал цену для чата {}", chatId, e);
+            responder.sendText(chatId, SOURCE_UNAVAILABLE);
         } catch (RuntimeException e) {
             log.error("Обработчик упал на сообщении из чата {}", chatId, e);
             responder.sendText(chatId, INTERNAL_ERROR);

@@ -1,13 +1,9 @@
 package ru.pricewatch;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
-/** Контекст поднимается: бины бота собираются, проперти читаются. */
-@SpringBootTest
-@ActiveProfiles("it")
-class PriceWatchApplicationIT {
+/** Контекст поднимается, Flyway накатывает схему, Hibernate её принимает (`ddl-auto: validate`). */
+class PriceWatchApplicationIT extends AbstractPostgresIT {
 
     @Test
     void contextLoads() {}

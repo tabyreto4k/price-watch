@@ -1,9 +1,19 @@
 package ru.pricewatch.bot;
 
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
 import org.springframework.stereotype.Component;
 import ru.pricewatch.bot.dto.BotReply;
+import ru.pricewatch.product.model.Product;
+import ru.pricewatch.product.service.ProductService;
+import ru.pricewatch.source.FetchedPrice;
+import ru.pricewatch.source.ResolvedInput;
+import ru.pricewatch.source.SourceRouter;
+import ru.pricewatch.subscription.service.SubscriptionService;
 
-/** Чистая маршрутизация текста в ответ: ни сети, ни состояния. */
+/** Транспорт: разобрать ввод, позвать сервисы, отформатировать ответ. Без бизнес-логики. */
 @Component
 public class CommandRouter {
 
@@ -20,13 +30,39 @@ public class CommandRouter {
 
             /help — эта справка""";
 
-    private static final String FALLBACK =
-            "Не понял. Пришли артикул Wildberries (число) или ссылку на товар. /help покажет примеры.";
+    private final SourceRouter sourceRouter;
+    private final ProductService productService;
+    private final SubscriptionService subscriptionService;
 
-    public BotReply route(String text) {
-        return switch (text.trim()) {
+    public CommandRouter(
+            SourceRouter sourceRouter, ProductService productService, SubscriptionService subscriptionService) {
+        this.sourceRouter = sourceRouter;
+        this.productService = productService;
+        this.subscriptionService = subscriptionService;
+    }
+
+    public BotReply route(long chatId, String text) {
+        String input = text.trim();
+        return switch (input) {
             case "/start", "/help" -> new BotReply(GREETING);
-            default -> new BotReply(FALLBACK);
+            default -> subscribe(chatId, input);
         };
+    }
+
+    private BotReply subscribe(long chatId, String input) {
+        ResolvedInput resolved = sourceRouter.resolve(input);
+        FetchedPrice fetched = sourceRouter.fetch(resolved);
+
+        Product product = productService.registerOrGet(resolved.type(), resolved.externalId(), fetched);
+        subscriptionService.subscribe(chatId, product);
+
+        return new BotReply("Слежу: %s, сейчас %s ₽".formatted(product.getTitle(), price(product.getLastPrice())));
+    }
+
+    private static String price(BigDecimal value) {
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.ROOT);
+        symbols.setGroupingSeparator(' ');
+        symbols.setDecimalSeparator(',');
+        return new DecimalFormat("#,##0.##", symbols).format(value);
     }
 }
