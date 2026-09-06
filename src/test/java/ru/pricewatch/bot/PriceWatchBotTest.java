@@ -27,7 +27,7 @@ class PriceWatchBotTest {
 
     @Test
     void sendsWhateverTheRouterAnswered() {
-        when(router.route(CHAT_ID, "/start")).thenReturn(new BotReply("Привет"));
+        when(router.route("/start")).thenReturn(new BotReply("Привет"));
 
         bot.consume(textUpdate("/start"));
 
@@ -36,7 +36,7 @@ class PriceWatchBotTest {
 
     @Test
     void turnsUserInputExceptionIntoItsOwnMessage() {
-        when(router.route(anyLong(), anyString())).thenThrow(new UserInputException("Не понял ссылку"));
+        when(router.route(anyString())).thenThrow(new UserInputException("Не понял ссылку"));
 
         bot.consume(textUpdate("http://мусор"));
 
@@ -46,7 +46,7 @@ class PriceWatchBotTest {
     /** Заход 1, критерий приёмки: исключение обработчика не должно убивать поллинг. */
     @Test
     void survivesAnyOtherException() {
-        when(router.route(anyLong(), anyString())).thenThrow(new IllegalStateException("boom"));
+        when(router.route(anyString())).thenThrow(new IllegalStateException("boom"));
 
         assertThatCode(() -> bot.consume(textUpdate("/start"))).doesNotThrowAnyException();
 

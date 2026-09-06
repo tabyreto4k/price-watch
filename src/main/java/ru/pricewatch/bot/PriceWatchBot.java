@@ -49,7 +49,7 @@ public class PriceWatchBot extends DefaultLongPollingUpdateConsumer implements S
         long chatId = update.getMessage().getChatId();
         try {
             responder.sendText(
-                    chatId, router.route(chatId, update.getMessage().getText()).text());
+                    chatId, router.route(update.getMessage().getText()).text());
         } catch (UserInputException e) {
             log.warn("Не разобрали ввод из чата {}: {}", chatId, e.getMessage());
             responder.sendText(chatId, e.getMessage());
