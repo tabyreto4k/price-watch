@@ -32,7 +32,8 @@ class CommandRouterTest {
     private final SourceRouter sourceRouter = mock(SourceRouter.class);
     private final ProductService productService = mock(ProductService.class);
     private final SubscriptionService subscriptionService = mock(SubscriptionService.class);
-    private final CommandRouter router = new CommandRouter(sourceRouter, productService, subscriptionService);
+    private final CommandRouter router =
+            new CommandRouter(sourceRouter, productService, subscriptionService, new PriceFormatter());
 
     @ParameterizedTest
     @ValueSource(strings = {"/start", "/help", "  /start  "})

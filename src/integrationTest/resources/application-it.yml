@@ -8,3 +8,6 @@ telegrambots:
 pricewatch:
   bot:
     token: it-dummy-token
+  monitor:
+    # Планировщик в тестах не должен сработать сам: джоб зовут руками.
+    initial-delay: PT24H

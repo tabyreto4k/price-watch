@@ -37,6 +37,9 @@ public class Product {
     @Column(nullable = false, length = 16)
     private ProductStatus status;
 
+    @Column(name = "failure_streak", nullable = false)
+    private int failureStreak;
+
     protected Product() {}
 
     public Product(SourceType source, String externalId, String title, BigDecimal lastPrice) {
@@ -51,6 +54,27 @@ public class Product {
     public void updatePrice(BigDecimal newPrice) {
         this.lastPrice = requirePositive(newPrice);
         this.status = ProductStatus.ACTIVE;
+        this.failureStreak = 0;
+    }
+
+    /**
+     * Источник ответил, хотя цена и не изменилась.
+     *
+     * @return была ли серия неудач сброшена — если нет, писать в БД нечего
+     */
+    public boolean noteSuccess() {
+        if (failureStreak == 0) {
+            return false;
+        }
+        failureStreak = 0;
+        return true;
+    }
+
+    /**
+     * @return сколько раз подряд источник уже не отдал цену
+     */
+    public int recordFailure() {
+        return ++failureStreak;
     }
 
     public void markUnavailable() {
@@ -97,5 +121,9 @@ public class Product {
 
     public ProductStatus getStatus() {
         return status;
+    }
+
+    public int getFailureStreak() {
+        return failureStreak;
     }
 }
