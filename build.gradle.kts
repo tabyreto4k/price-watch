@@ -36,6 +36,9 @@ dependencies {
   implementation(libs.telegrambots.client)
   implementation("org.springframework.boot:spring-boot-starter-data-jpa")
   implementation("org.flywaydb:flyway-core")
+  implementation("org.springframework.boot:spring-boot-starter-webflux")
+  implementation(libs.resilience4j.ratelimiter)
+  implementation(libs.jsoup)
 
   // Flyway 10 вынес поддержку каждой СУБД в отдельный модуль.
   runtimeOnly("org.flywaydb:flyway-database-postgresql")
@@ -44,6 +47,7 @@ dependencies {
   runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
   testImplementation("org.springframework.boot:spring-boot-starter-test")
+  testImplementation(libs.mockwebserver)
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
   add(integrationTest.implementationConfigurationName, "org.springframework.boot:spring-boot-starter-test")
