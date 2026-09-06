@@ -70,8 +70,11 @@ public class SourceHttpClient {
             return Optional.empty();
         }
         String header = response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER);
+        if (header == null) {
+            return Optional.empty();
+        }
         try {
-            return Optional.ofNullable(header).map(value -> Duration.ofSeconds(Long.parseLong(value.trim())));
+            return Optional.of(Duration.ofSeconds(Long.parseLong(header.trim())));
         } catch (NumberFormatException e) {
             // Retry-After бывает и датой; тогда просто отработает обычный backoff.
             log.debug("Не разобрали Retry-After: {}", header);
