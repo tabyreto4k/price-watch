@@ -1,0 +1,10 @@
+# Профиль, а не одноимённый application.yml: файл с тем же именем в тестовом source set
+# затенил бы основной целиком, а не дополнил его.
+
+# Регистрация бота выключена: иначе тест полез бы за апдейтами в реальный Bot API.
+telegrambots:
+  enabled: false
+
+pricewatch:
+  bot:
+    token: it-dummy-token

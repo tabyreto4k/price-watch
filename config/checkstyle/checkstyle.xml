@@ -24,7 +24,11 @@
         <module name="MemberName"/>
         <module name="ParameterName"/>
         <module name="LocalVariableName"/>
-        <module name="ConstantName"/>
+        <!-- `log` вместо `LOG`: static final Logger — идиома slf4j, а не константа
+             в смысле «неизменяемое значение». Остальные static final — UPPER_SNAKE. -->
+        <module name="ConstantName">
+            <property name="format" value="^(log|[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$"/>
+        </module>
 
         <!-- Структурные ловушки -->
         <module name="EmptyCatchBlock">
