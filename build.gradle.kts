@@ -102,3 +102,7 @@ tasks.jacocoTestCoverageVerification {
 }
 
 tasks.check { dependsOn(integrationTestTask, tasks.jacocoTestCoverageVerification) }
+
+// Сервис поставляется bootJar'ом, обычный jar никому не нужен. Пока он собирался, в build/libs
+// лежало два архива, и шаблон *.jar в Dockerfile выхватывал -plain.jar без манифеста.
+tasks.named("jar") { enabled = false }
