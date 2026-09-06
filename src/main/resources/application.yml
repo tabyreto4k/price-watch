@@ -6,6 +6,15 @@ spring:
       enabled: true
   lifecycle:
     timeout-per-shutdown-phase: 20s
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:pricewatch}
+    username: ${POSTGRES_USER:pricewatch}
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Схему держит Flyway; Hibernate только сверяется с ней и падает при расхождении.
+      ddl-auto: validate
 
 pricewatch:
   bot:
