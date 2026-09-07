@@ -219,6 +219,16 @@ class CommandRouterTest {
         assertThat(router.route(CHAT_ID, input).text()).contains("Порог 10%").contains("Кружка керамическая");
     }
 
+    /** Цифр в команде сколько угодно, в `int` и `long` — нет: переполнение должно быть ответом, а не стеком. */
+    @ParameterizedTest
+    @ValueSource(strings = {"порог 99999999999", "/chart_99999999999999999999"})
+    void answersInsteadOfOverflowingOnAbsurdNumbers(String input) {
+        assertThatThrownBy(() -> router.route(CHAT_ID, input)).isInstanceOf(UserInputException.class);
+
+        verify(subscriptionService, never()).setThreshold(anyLong(), anyInt());
+        verify(subscriptionService, never()).requireOwned(anyLong(), anyLong());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"порог 0", "порог 101"})
     void rejectsThresholdOutsideOfItsRange(String input) {

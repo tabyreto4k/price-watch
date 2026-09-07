@@ -49,12 +49,13 @@ public class CommandRouter {
 
     private static final String THRESHOLD_RANGE = "Порог — целое число от 1 до 100. Например: порог 10";
 
+    private static final String NO_SUCH_SUBSCRIPTION = "Не нашёл такую подписку. Её номер есть в /list.";
+
     /** Порог набирают руками, поэтому и «Порог», и лишние пробелы — нормальный ввод. */
     private static final Pattern THRESHOLD_COMMAND =
-            Pattern.compile("^порог\\s+(\\d{1,3})$", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+            Pattern.compile("^порог\\s+(\\d+)$", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
-    /** Длина ограничена: id подписки длиннее 18 цифр не бывает, а `parseLong` на таком бросает. */
-    private static final Pattern CHART_COMMAND = Pattern.compile("^/chart_(\\d{1,18})$");
+    private static final Pattern CHART_COMMAND = Pattern.compile("^/chart_(\\d+)$");
 
     private final SourceRouter sourceRouter;
     private final ProductService productService;
@@ -87,7 +88,7 @@ public class CommandRouter {
         }
         Matcher chart = CHART_COMMAND.matcher(input);
         if (chart.matches()) {
-            return chart(chatId, Long.parseLong(chart.group(1)));
+            return chart(chatId, subscriptionId(chart.group(1)));
         }
 
         return switch (input) {
@@ -149,7 +150,7 @@ public class CommandRouter {
     }
 
     private BotReply setThreshold(long chatId, String percent) {
-        int value = Integer.parseInt(percent);
+        int value = percentage(percent);
         if (value < 1 || value > 100) {
             throw new UserInputException(THRESHOLD_RANGE);
         }
@@ -188,6 +189,23 @@ public class CommandRouter {
                         priceFormatter.format(prices.get(0)),
                         priceFormatter.format(prices.get(prices.size() - 1)),
                         chartWindow.toDays());
+    }
+
+    /** Цифр в команде сколько угодно, а в `long` влезает 19: всё, что длиннее, — не подписка. */
+    private static long subscriptionId(String digits) {
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException e) {
+            throw new UserInputException(NO_SUCH_SUBSCRIPTION);
+        }
+    }
+
+    private static int percentage(String digits) {
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException e) {
+            throw new UserInputException(THRESHOLD_RANGE);
+        }
     }
 
     private static String arrow(BigDecimal previous, BigDecimal current) {
