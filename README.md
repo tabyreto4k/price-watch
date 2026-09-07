@@ -60,13 +60,14 @@ cp .env.example .env      # BOT_TOKEN от @BotFather и POSTGRES_PASSWORD
 docker compose up -d --wait
 ```
 
-Готовый образ каждой ревизии `main` лежит в GHCR:
+Готовый образ каждой ревизии `main` лежит в GHCR — им можно поднять тот же стек, не
+собирая ничего локально:
 
 ```bash
-docker run --rm --env-file .env ghcr.io/tabyreto4k/price-watch:latest
+IMAGE_TAG=latest docker compose -f compose.prod.yml up -d --wait
 ```
 
-Проверка:
+Проверка — в dev-компоузе порт 8080 проброшен на localhost (в проде он не публикуется):
 
 ```bash
 curl -s localhost:8080/actuator/health      # {"status":"UP", ...}
