@@ -2,9 +2,11 @@ package ru.pricewatch.bot;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,6 +14,8 @@ import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.chat.Chat;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
@@ -30,11 +34,35 @@ class PriceWatchBotTest {
 
     @Test
     void sendsWhateverTheRouterAnswered() {
-        when(router.route(CHAT_ID, "/start")).thenReturn(new BotReply("Привет"));
+        BotReply reply = BotReply.message("Привет");
+        when(router.route(CHAT_ID, "/start")).thenReturn(reply);
 
         bot.consume(textUpdate("/start"));
 
-        verify(responder).sendText(CHAT_ID, "Привет");
+        verify(responder).send(CHAT_ID, reply);
+    }
+
+    @Test
+    void routesButtonPressesAndConfirmsThem() {
+        BotReply reply = BotReply.message("Больше не слежу");
+        when(router.routeCallback(CHAT_ID, "drop:12")).thenReturn(reply);
+
+        bot.consume(callbackUpdate("drop:12"));
+
+        // Подтверждение нажатия — раньше ответа: иначе кнопка крутится всё время обработки.
+        InOrder order = inOrder(responder);
+        order.verify(responder).answerCallback("cb-1");
+        order.verify(responder).send(CHAT_ID, reply);
+    }
+
+    @Test
+    void confirmsButtonPressEvenWhenHandlerFailed() {
+        when(router.routeCallback(anyLong(), anyString())).thenThrow(new UserInputException("Кнопка устарела"));
+
+        bot.consume(callbackUpdate("drop:12"));
+
+        verify(responder).answerCallback("cb-1");
+        verify(responder).sendText(CHAT_ID, "Кнопка устарела");
     }
 
     @Test
@@ -71,7 +99,22 @@ class PriceWatchBotTest {
     void ignoresUpdatesWithoutText() {
         bot.consume(new Update());
 
+        verify(responder, never()).send(anyLong(), any());
         verify(responder, never()).sendText(anyLong(), anyString());
+    }
+
+    private static Update callbackUpdate(String data) {
+        Message message = new Message();
+        message.setChat(new Chat(CHAT_ID, "private"));
+
+        CallbackQuery callback = new CallbackQuery();
+        callback.setId("cb-1");
+        callback.setMessage(message);
+        callback.setData(data);
+
+        Update update = new Update();
+        update.setCallbackQuery(callback);
+        return update;
     }
 
     private static Update textUpdate(String text) {

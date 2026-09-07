@@ -16,4 +16,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     /** join fetch: список читается вне транзакции, а товар нужен вместе с подпиской. */
     @Query("select s from Subscription s join fetch s.product where s.chatId = :chatId order by s.id")
     List<Subscription> findByChatIdWithProduct(long chatId);
+
+    @Query("select s from Subscription s join fetch s.product where s.id = :id")
+    Optional<Subscription> findByIdWithProduct(long id);
 }

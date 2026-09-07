@@ -1,12 +1,15 @@
 package ru.pricewatch.bot;
 
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer;
 import org.telegram.telegrambots.longpolling.starter.SpringLongPollingBot;
 import org.telegram.telegrambots.longpolling.util.DefaultLongPollingUpdateConsumer;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import ru.pricewatch.bot.dto.BotReply;
 import ru.pricewatch.config.BotProperties;
 import ru.pricewatch.exception.SourceException;
 import ru.pricewatch.exception.UserInputException;
@@ -47,13 +50,33 @@ public class PriceWatchBot extends DefaultLongPollingUpdateConsumer implements S
 
     @Override
     public void consume(Update update) {
+        if (update.hasCallbackQuery()) {
+            consumeCallback(update.getCallbackQuery());
+            return;
+        }
         if (!update.hasMessage() || !update.getMessage().hasText()) {
             return;
         }
         long chatId = update.getMessage().getChatId();
+        String text = update.getMessage().getText();
+        answer(chatId, () -> router.route(chatId, text));
+    }
+
+    private void consumeCallback(CallbackQuery callback) {
+        // Часики на кнопке крутятся, пока нажатие не подтверждено, — и до, и после ответа.
+        responder.answerCallback(callback.getId());
+        if (callback.getMessage() == null) {
+            // Кнопка из inline-режима: отвечать некуда, а он у бота не включён.
+            return;
+        }
+        long chatId = callback.getMessage().getChatId();
+        answer(chatId, () -> router.routeCallback(chatId, callback.getData()));
+    }
+
+    /** Единственный catch проекта: что бы ни случилось, пользователь получает ответ, поллинг живёт. */
+    private void answer(long chatId, Supplier<BotReply> handler) {
         try {
-            responder.sendText(
-                    chatId, router.route(chatId, update.getMessage().getText()).text());
+            responder.send(chatId, handler.get());
         } catch (UserInputException e) {
             log.warn("Не разобрали ввод из чата {}: {}", chatId, e.getMessage());
             responder.sendText(chatId, e.getMessage());

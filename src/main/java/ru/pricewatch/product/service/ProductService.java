@@ -1,8 +1,11 @@
 package ru.pricewatch.product.service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.pricewatch.product.model.PricePoint;
@@ -65,6 +68,32 @@ public class ProductService {
         }
         products.save(product);
         return exhausted;
+    }
+
+    /**
+     * История для графика: точки за окно плюс текущая цена «сейчас». Точка пишется только
+     * при изменении [Р9], поэтому без неё линия обрывалась бы на последнем изменении, а у
+     * товара, который не менялся дольше окна, точек не осталось бы вовсе.
+     */
+    @Transactional(readOnly = true)
+    public List<PricePoint> chartHistory(Product product, Duration window) {
+        Instant now = Instant.now();
+        List<PricePoint> history = new ArrayList<>(
+                pricePoints.findByProductAndRecordedAtGreaterThanEqualOrderByRecordedAtAsc(product, now.minus(window)));
+        // Точка «сейчас» никуда не сохраняется: она нужна только линии на графике.
+        history.add(new PricePoint(product, product.getLastPrice(), now));
+        return history;
+    }
+
+    /**
+     * @return цена, с которой сравнивается текущая; пусто, пока товар не менялся ни разу
+     */
+    @Transactional(readOnly = true)
+    public Optional<BigDecimal> previousPrice(Product product) {
+        List<PricePoint> lastTwo = pricePoints.findTop2ByProductOrderByRecordedAtDescIdDesc(product);
+        return lastTwo.size() < 2
+                ? Optional.empty()
+                : Optional.of(lastTwo.get(1).getPrice());
     }
 
     @Transactional(readOnly = true)

@@ -41,6 +41,7 @@ dependencies {
   implementation(libs.jsoup)
   implementation(libs.shedlock.spring)
   implementation(libs.shedlock.jdbc)
+  implementation(libs.jfreechart)
 
   // Flyway 10 вынес поддержку каждой СУБД в отдельный модуль.
   runtimeOnly("org.flywaydb:flyway-database-postgresql")
@@ -58,7 +59,11 @@ dependencies {
   add(integrationTest.implementationConfigurationName, "org.testcontainers:postgresql")
 }
 
-tasks.withType<Test>().configureEach { useJUnitPlatform() }
+tasks.withType<Test>().configureEach {
+  useJUnitPlatform()
+  // JFreeChart рисует через AWT: без headless тестовая JVM ищет дисплей.
+  systemProperty("java.awt.headless", "true")
+}
 
 tasks.withType<JavaCompile>().configureEach { options.compilerArgs.add("-Xlint:deprecation") }
 
