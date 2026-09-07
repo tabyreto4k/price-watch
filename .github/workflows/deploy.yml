@@ -1,0 +1,115 @@
+name: deploy
+
+# Образ собирает и публикует release.yml — здесь только выкат [Р10]: VPS ничего
+# не собирает, он тянет готовый образ из GHCR.
+on:
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Тег образа в GHCR. Откат — sha-<полный sha> прошлой ревизии."
+        required: true
+        default: latest
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+  # Нужно, чтобы прочитать статус прогона ci на том же коммите.
+  actions: read
+
+env:
+  APP_DIR: price-watch
+
+jobs:
+  deploy:
+    name: deploy to vps
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Выбрать тег образа
+        id: image
+        env:
+          MANUAL_TAG: ${{ inputs.image_tag }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=$MANUAL_TAG" >> "$GITHUB_OUTPUT"
+          else
+            # release.yml публикует sha-тег полным хэшем (metadata-action, format=long).
+            echo "tag=sha-$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Образ собирается без тестов, поэтому зелёный релиз ещё не значит рабочий коммит.
+      - name: Дождаться зелёного CI на этом коммите
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          for _ in $(seq 1 30); do
+            conclusion=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SHA" \
+              --jq '[.workflow_runs[] | select(.name == "ci")] | first | .conclusion // "pending"')
+            case "$conclusion" in
+              success) echo "CI на $SHA зелёный"; exit 0 ;;
+              pending) sleep 20 ;;
+              *) echo "::error::CI на $SHA — $conclusion, выкатывать нечего"; exit 1 ;;
+            esac
+          done
+          echo "::error::CI на $SHA не завершился за 10 минут"
+          exit 1
+
+      - name: Положить compose на VPS
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: compose.prod.yml
+          target: ${{ env.APP_DIR }}
+
+      - name: Выкатить образ
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: APP_DIR,IMAGE_TAG,GHCR_USER,GHCR_TOKEN
+          script_stop: true
+          script: |
+            cd "$APP_DIR"
+            # Токен живёт только этот прогон — на VPS долгоживущих ключей от GHCR не остаётся.
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            export IMAGE_TAG
+            docker compose -f compose.prod.yml pull
+            # --wait: выкат считается удачным только когда healthcheck позеленел.
+            docker compose -f compose.prod.yml up -d --wait --wait-timeout 180
+            docker logout ghcr.io
+            docker image prune -f
+            docker compose -f compose.prod.yml ps
+        env:
+          APP_DIR: ${{ env.APP_DIR }}
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Итог
+        run: |
+          {
+            echo "### Выкачено на VPS"
+            echo '```'
+            echo "ghcr.io/${{ github.repository }}:${{ steps.image.outputs.tag }}"
+            echo '```'
+            echo "Откат: Actions → deploy → Run workflow → тег предыдущей ревизии."
+          } >> "$GITHUB_STEP_SUMMARY"
