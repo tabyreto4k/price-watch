@@ -24,6 +24,10 @@ pricewatch:
     # Первый прогон не сразу после старта: дать приложению устояться.
     initial-delay: PT1M
     max-source-failures: 3
+  chart:
+    # Столько истории попадает на график [Р7]; окно короче делает картинку пустой у
+    # товаров с редкими изменениями цены.
+    history-window: P90D
   source:
     # Честный User-Agent с контактом — часть уважительного обращения с чужим API.
     user-agent: "PriceWatchBot/0.1 (+https://github.com/tabyreto4k/price-watch)"

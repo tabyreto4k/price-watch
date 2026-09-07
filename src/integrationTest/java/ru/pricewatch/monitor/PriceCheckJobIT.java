@@ -1,6 +1,7 @@
 package ru.pricewatch.monitor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
@@ -17,6 +18,7 @@ import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -24,6 +26,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import ru.pricewatch.AbstractPostgresIT;
 import ru.pricewatch.bot.BotResponder;
+import ru.pricewatch.bot.dto.BotReply;
 import ru.pricewatch.product.model.Product;
 import ru.pricewatch.product.model.ProductStatus;
 import ru.pricewatch.product.repository.PricePointRepository;
@@ -100,7 +103,12 @@ class PriceCheckJobIT extends AbstractPostgresIT {
         assertThat(products.findById(product.getId()).orElseThrow().getLastPrice())
                 .isEqualByComparingTo("1790.00");
         assertThat(pricePoints.findByProductOrderByRecordedAtAsc(product)).hasSize(2);
-        verify(responder).sendText(eq(CHAT_ID), contains("⬇"));
+
+        ArgumentCaptor<BotReply> alert = ArgumentCaptor.forClass(BotReply.class);
+        verify(responder).send(eq(CHAT_ID), alert.capture());
+        assertThat(alert.getValue().text()).contains("⬇");
+        // Из уведомления должен открываться график — иначе кнопка в /list остаётся единственным входом.
+        assertThat(alert.getValue().keyboard()).isNotEmpty();
     }
 
     @Test
@@ -111,7 +119,7 @@ class PriceCheckJobIT extends AbstractPostgresIT {
         runCheck();
 
         assertThat(pricePoints.findByProductOrderByRecordedAtAsc(product)).hasSize(1);
-        verify(responder, never()).sendText(anyLong(), anyString());
+        verifyNoAlerts();
     }
 
     @Test
@@ -121,7 +129,7 @@ class PriceCheckJobIT extends AbstractPostgresIT {
 
         runCheck();
 
-        verify(responder, never()).sendText(anyLong(), anyString());
+        verifyNoAlerts();
     }
 
     /** Упавший источник одного товара не должен уносить с собой весь батч. */
@@ -157,7 +165,7 @@ class PriceCheckJobIT extends AbstractPostgresIT {
         job.checkAll();
 
         assertThat(UPSTREAM.getRequestCount()).isEqualTo(requestsBefore);
-        verify(responder, never()).sendText(anyLong(), anyString());
+        verifyNoAlerts();
     }
 
     @Test
@@ -186,6 +194,12 @@ class PriceCheckJobIT extends AbstractPostgresIT {
 
         assertThat(products.findById(product.getId()).orElseThrow().getFailureStreak())
                 .isZero();
+    }
+
+    /** Уведомления уходят двумя путями: текстом и ответом с кнопкой. Молчание — это оба. */
+    private void verifyNoAlerts() {
+        verify(responder, never()).send(anyLong(), any());
+        verify(responder, never()).sendText(anyLong(), anyString());
     }
 
     /**

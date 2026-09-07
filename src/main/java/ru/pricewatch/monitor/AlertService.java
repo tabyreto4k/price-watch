@@ -1,10 +1,13 @@
 package ru.pricewatch.monitor;
 
 import java.math.BigDecimal;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.pricewatch.bot.BotResponder;
 import ru.pricewatch.bot.PriceFormatter;
+import ru.pricewatch.bot.dto.BotButton;
+import ru.pricewatch.bot.dto.BotReply;
 import ru.pricewatch.product.model.Product;
 import ru.pricewatch.subscription.model.Subscription;
 import ru.pricewatch.subscription.repository.SubscriptionRepository;
@@ -34,7 +37,10 @@ public class AlertService {
         String text = dropText(product, oldPrice, newPrice);
         for (Subscription subscription : subscriptions.findByProduct(product)) {
             if (policy.shouldNotify(oldPrice, newPrice, subscription.getThresholdPercent())) {
-                responder.sendText(subscription.getChatId(), text);
+                // График прямо из уведомления: смотреть на падение интереснее в истории.
+                responder.send(
+                        subscription.getChatId(),
+                        BotReply.message(text, List.of(List.of(BotButton.chart(subscription.getId())))));
             }
         }
     }
