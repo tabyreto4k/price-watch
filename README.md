@@ -7,10 +7,13 @@
 [![coverage gate](https://img.shields.io/badge/coverage%20gate-70%25-blue)](https://github.com/tabyreto4k/price-watch/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Telegram-бот, который следит за ценой товара и пишет, когда она упала.
+Telegram-бот, который следит за ценой товара и пишет, когда она упала. Кидаешь ему
+артикул Wildberries или ссылку — он запоминает цену, обходит источники по расписанию и
+уведомляет о снижении; по кнопке рисует график истории.
 
-**Живой бот: [t.me/PRICEWATCH_BOT_USERNAME](https://t.me/PRICEWATCH_BOT_USERNAME)** — кинь
-ему артикул Wildberries или ссылку на товар.
+Публичной ссылки на бота здесь нет намеренно: это учебный проект, а не сервис, за
+которым кто-то должен следить. Поднять свой — [три команды ниже](#запуск-локально), токен
+берётся у @BotFather.
 
 Фактическое покрытие печатается в summary каждого прогона `ci`; ниже 70% сборка не
 проходит.
