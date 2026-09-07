@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import ru.pricewatch.AbstractPostgresIT;
+import ru.pricewatch.product.model.PricePoint;
 import ru.pricewatch.product.model.Product;
 import ru.pricewatch.product.repository.PricePointRepository;
 import ru.pricewatch.product.repository.ProductRepository;
@@ -101,6 +104,43 @@ class ProductServiceIT extends AbstractPostgresIT {
         assertThat(pricePoints.findByProductOrderByRecordedAtAsc(product))
                 .extracting(point -> point.getPrice().stripTrailingZeros().toPlainString())
                 .containsExactly("1990", "1790");
+    }
+
+    @Test
+    void chartHistoryEndsWithTheCurrentPrice() {
+        Product product = productService.registerOrGet(SourceType.WILDBERRIES, ARTICLE, FETCHED);
+        productService.recordPriceChange(product, new BigDecimal("1790.00"));
+
+        assertThat(productService.chartHistory(product, Duration.ofDays(90)))
+                .extracting(point -> point.getPrice().stripTrailingZeros().toPlainString())
+                .containsExactly("1990", "1790", "1790");
+    }
+
+    /** Цена не менялась дольше окна: точек в нём нет, но график всё равно есть что рисовать. */
+    @Test
+    void chartHistoryOfAnUnchangedProductIsItsCurrentPrice() {
+        Product product = productService.registerOrGet(SourceType.WILDBERRIES, ARTICLE, FETCHED);
+        pricePoints.deleteAll();
+        pricePoints.save(
+                new PricePoint(product, new BigDecimal("1990.00"), Instant.now().minus(Duration.ofDays(120))));
+
+        assertThat(productService.chartHistory(product, Duration.ofDays(90))).hasSize(1);
+    }
+
+    @Test
+    void previousPriceIsEmptyUntilThePriceMoves() {
+        Product product = productService.registerOrGet(SourceType.WILDBERRIES, ARTICLE, FETCHED);
+
+        assertThat(productService.previousPrice(product)).isEmpty();
+    }
+
+    @Test
+    void previousPriceIsTheOneBeforeTheLastChange() {
+        Product product = productService.registerOrGet(SourceType.WILDBERRIES, ARTICLE, FETCHED);
+        productService.recordPriceChange(product, new BigDecimal("1790.00"));
+
+        assertThat(productService.previousPrice(product))
+                .hasValueSatisfying(price -> assertThat(price).isEqualByComparingTo("1990.00"));
     }
 
     /** `1990.00` и `1990.0` — одна и та же цена: сравнение только через compareTo. */
