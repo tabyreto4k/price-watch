@@ -38,6 +38,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Пока VPS не заведён, секретов нет — деплой пропускается, а не краснеет.
+      - name: Проверить, что VPS настроен
+        id: vps
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          if [ -n "$VPS_HOST" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Секрет VPS_HOST не задан — выкат пропущен."
+          fi
+
       - name: Выбрать тег образа
         id: image
         env:
@@ -53,7 +66,7 @@ jobs:
 
       # Образ собирается без тестов, поэтому зелёный релиз ещё не значит рабочий коммит.
       - name: Дождаться зелёного CI на этом коммите
-        if: github.event_name != 'workflow_dispatch'
+        if: steps.vps.outputs.ready == 'true' && github.event_name != 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.workflow_run.head_sha }}
@@ -71,6 +84,7 @@ jobs:
           exit 1
 
       - name: Положить compose на VPS
+        if: steps.vps.outputs.ready == 'true'
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -80,6 +94,7 @@ jobs:
           target: ${{ env.APP_DIR }}
 
       - name: Выкатить образ
+        if: steps.vps.outputs.ready == 'true'
         uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -105,6 +120,7 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Итог
+        if: steps.vps.outputs.ready == 'true'
         run: |
           {
             echo "### Выкачено на VPS"
