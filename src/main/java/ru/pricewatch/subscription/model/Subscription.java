@@ -38,6 +38,14 @@ public class Subscription {
         this.product = Objects.requireNonNull(product, "product");
     }
 
+    /** Порог хранится в процентах и повторяет ограничение схемы: 1..100. */
+    public void setThreshold(int percent) {
+        if (percent < 1 || percent > 100) {
+            throw new IllegalArgumentException("Порог должен быть от 1 до 100 процентов, а не " + percent);
+        }
+        this.thresholdPercent = percent;
+    }
+
     public boolean belongsTo(long candidateChatId) {
         return chatId == candidateChatId;
     }

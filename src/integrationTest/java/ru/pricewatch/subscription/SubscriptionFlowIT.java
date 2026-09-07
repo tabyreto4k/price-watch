@@ -95,6 +95,51 @@ class SubscriptionFlowIT extends AbstractPostgresIT {
         assertThat(subscriptions.count()).isZero();
     }
 
+    @Test
+    void setsThresholdOnTheSubscriptionAddedLast() {
+        subscriptionService.subscribe(CHAT_ID, product);
+        Product another = productService.registerOrGet(
+                SourceType.WILDBERRIES, "87654321", new FetchedPrice("Чайник", new BigDecimal("2490.00")));
+        Subscription latest = subscriptionService.subscribe(CHAT_ID, another);
+
+        Subscription updated = subscriptionService.setThreshold(CHAT_ID, 10);
+
+        assertThat(updated.getId()).isEqualTo(latest.getId());
+        assertThat(subscriptions.findById(latest.getId()).orElseThrow().getThresholdPercent())
+                .isEqualTo(10);
+    }
+
+    @Test
+    void refusesThresholdWhenTheChatHasNoSubscriptions() {
+        assertThatThrownBy(() -> subscriptionService.setThreshold(CHAT_ID, 10)).isInstanceOf(UserInputException.class);
+    }
+
+    /** Инвариант сущности повторяет CHECK схемы: за границу 1..100 порог не пускается. */
+    @Test
+    void rejectsThresholdOutsideOfItsRange() {
+        subscriptionService.subscribe(CHAT_ID, product);
+
+        assertThatThrownBy(() -> subscriptionService.setThreshold(CHAT_ID, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void loadsOwnSubscriptionTogetherWithItsProduct() {
+        Subscription subscription = subscriptionService.subscribe(CHAT_ID, product);
+
+        Subscription found = subscriptionService.requireOwned(CHAT_ID, subscription.getId());
+
+        assertThat(found.getProduct().getTitle()).isEqualTo("Кружка");
+    }
+
+    @Test
+    void refusesToOpenSomeoneElsesSubscription() {
+        Subscription foreign = subscriptionService.subscribe(OTHER_CHAT_ID, product);
+
+        assertThatThrownBy(() -> subscriptionService.requireOwned(CHAT_ID, foreign.getId()))
+                .isInstanceOf(UserInputException.class);
+    }
+
     /** Чужой id подписки не должен удалять чужую подписку. */
     @Test
     void refusesToUnsubscribeSomeoneElsesSubscription() {
