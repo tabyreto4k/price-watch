@@ -31,8 +31,11 @@ jobs:
       - name: Format & lint
         run: ./gradlew spotlessCheck checkstyleMain checkstyleTest
 
+      # Гейт покрытия здесь исключён намеренно: домен и джоб проверяются интеграционными
+      # тестами, и без их данных счёт заведомо не сойдётся. Порог считается ниже, когда
+      # отработали оба прогона.
       - name: Build & unit tests
-        run: ./gradlew build -x integrationTest
+        run: ./gradlew build -x integrationTest -x jacocoTestCoverageVerification
 
       - name: Integration tests
         run: ./gradlew integrationTest

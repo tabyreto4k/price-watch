@@ -2,10 +2,12 @@ package ru.pricewatch.product.service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.pricewatch.product.model.PricePoint;
 import ru.pricewatch.product.model.Product;
+import ru.pricewatch.product.model.ProductStatus;
 import ru.pricewatch.product.repository.PricePointRepository;
 import ru.pricewatch.product.repository.ProductRepository;
 import ru.pricewatch.source.FetchedPrice;
@@ -37,12 +39,37 @@ public class ProductService {
     @Transactional
     public boolean recordPriceChange(Product product, BigDecimal newPrice) {
         if (product.hasPrice(newPrice)) {
+            // Источник ответил — серия неудач обнуляется. Если её не было, писать нечего.
+            if (product.noteSuccess()) {
+                products.save(product);
+            }
             return false;
         }
         product.updatePrice(newPrice);
         products.save(product);
         pricePoints.save(new PricePoint(product, newPrice, Instant.now()));
         return true;
+    }
+
+    /**
+     * Источник не отдал цену. После {@code maxFailures} неудач подряд товар уходит из
+     * проверок.
+     *
+     * @return стал ли товар недоступным именно сейчас — уведомить подписчиков нужно один раз
+     */
+    @Transactional
+    public boolean recordFailure(Product product, int maxFailures) {
+        boolean exhausted = product.recordFailure() >= maxFailures && product.getStatus() == ProductStatus.ACTIVE;
+        if (exhausted) {
+            product.markUnavailable();
+        }
+        products.save(product);
+        return exhausted;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Product> findActiveWithSubscribers() {
+        return products.findActiveWithSubscribers();
     }
 
     private Product register(SourceType source, String externalId, FetchedPrice fetched) {

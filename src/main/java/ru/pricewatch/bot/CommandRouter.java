@@ -1,9 +1,5 @@
 package ru.pricewatch.bot;
 
-import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.Locale;
 import org.springframework.stereotype.Component;
 import ru.pricewatch.bot.dto.BotReply;
 import ru.pricewatch.product.model.Product;
@@ -33,12 +29,17 @@ public class CommandRouter {
     private final SourceRouter sourceRouter;
     private final ProductService productService;
     private final SubscriptionService subscriptionService;
+    private final PriceFormatter priceFormatter;
 
     public CommandRouter(
-            SourceRouter sourceRouter, ProductService productService, SubscriptionService subscriptionService) {
+            SourceRouter sourceRouter,
+            ProductService productService,
+            SubscriptionService subscriptionService,
+            PriceFormatter priceFormatter) {
         this.sourceRouter = sourceRouter;
         this.productService = productService;
         this.subscriptionService = subscriptionService;
+        this.priceFormatter = priceFormatter;
     }
 
     public BotReply route(long chatId, String text) {
@@ -56,13 +57,7 @@ public class CommandRouter {
         Product product = productService.registerOrGet(resolved.type(), resolved.externalId(), fetched);
         subscriptionService.subscribe(chatId, product);
 
-        return new BotReply("Слежу: %s, сейчас %s ₽".formatted(product.getTitle(), price(product.getLastPrice())));
-    }
-
-    private static String price(BigDecimal value) {
-        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.ROOT);
-        symbols.setGroupingSeparator(' ');
-        symbols.setDecimalSeparator(',');
-        return new DecimalFormat("#,##0.##", symbols).format(value);
+        return new BotReply(
+                "Слежу: %s, сейчас %s ₽".formatted(product.getTitle(), priceFormatter.format(product.getLastPrice())));
     }
 }

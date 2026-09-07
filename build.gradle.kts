@@ -39,6 +39,8 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-webflux")
   implementation(libs.resilience4j.ratelimiter)
   implementation(libs.jsoup)
+  implementation(libs.shedlock.spring)
+  implementation(libs.shedlock.jdbc)
 
   // Flyway 10 вынес поддержку каждой СУБД в отдельный модуль.
   runtimeOnly("org.flywaydb:flyway-database-postgresql")

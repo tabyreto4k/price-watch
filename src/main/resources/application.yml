@@ -19,6 +19,11 @@ spring:
 pricewatch:
   bot:
     token: ${BOT_TOKEN}
+  monitor:
+    check-interval: ${CHECK_INTERVAL:PT30M}
+    # Первый прогон не сразу после старта: дать приложению устояться.
+    initial-delay: PT1M
+    max-source-failures: 3
   source:
     # Честный User-Agent с контактом — часть уважительного обращения с чужим API.
     user-agent: "PriceWatchBot/0.1 (+https://github.com/tabyreto4k/price-watch)"
