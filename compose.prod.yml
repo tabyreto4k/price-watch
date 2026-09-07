@@ -1,0 +1,58 @@
+# VPS: образ тянется из GHCR, здесь ничего не собирается [Р10].
+# Запуск: IMAGE_TAG=sha-<...> docker compose -f compose.prod.yml up -d --wait
+name: price-watch
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pricewatch}
+      POSTGRES_USER: ${POSTGRES_USER:-pricewatch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задай POSTGRES_PASSWORD в .env}
+    # Порт наружу не публикуется вовсе: до базы ходит только бот из этой же сети.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pricewatch} -d ${POSTGRES_DB:-pricewatch}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  bot:
+    # Тег задаёт деплой: конкретный `sha-<...>` вместо `latest` делает выкат
+    # воспроизводимым, а откат — тем же запуском с прошлым тегом.
+    image: ghcr.io/tabyreto4k/price-watch:${IMAGE_TAG:-latest}
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:?положи токен бота в .env на VPS}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CHECK_INTERVAL: ${CHECK_INTERVAL:-PT30M}
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-pricewatch}
+      POSTGRES_USER: ${POSTGRES_USER:-pricewatch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задай POSTGRES_PASSWORD в .env}
+    # Бот ходит наружу сам (long polling [Р2]), входящих соединений у него нет:
+    # actuator слушает только внутри сети compose.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          # Дешёвый VPS: heap считается от лимита контейнера (JAVA_TOOL_OPTIONS в образе).
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pgdata:

@@ -43,6 +43,21 @@ jobs:
       - name: Coverage report
         run: ./gradlew jacocoTestReport jacocoTestCoverageVerification
 
+      - name: Покрытие в summary
+        if: always()
+        run: |
+          report=build/reports/jacoco/test/jacocoTestReport.xml
+          [ -f "$report" ] || exit 0
+          python3 - "$report" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import re, sys
+          xml = open(sys.argv[1]).read()
+          missed, covered = map(int, re.findall(
+              r'<counter type="INSTRUCTION" missed="(\d+)" covered="(\d+)"/>', xml)[-1])
+          print("### Покрытие\n")
+          print(f"**{covered / (missed + covered):.1%}** по инструкциям.")
+          print("Гейт считает то же без `config/`, `dto/` и точки входа, порог — 70%.")
+          PY
+
       - name: Publish test results
         if: always()
         uses: actions/upload-artifact@v4
